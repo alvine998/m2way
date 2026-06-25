@@ -1,0 +1,135 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: m2way-nginx
+    ports:
+      - "${APP_PORT:-80}:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - app
+    networks:
+      - m2way
+
+  app:
+    build:
+      context: .
+      target: dev
+    image: m2way-app:dev
+    container_name: m2way-app
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=m2way
+      - DB_USERNAME=m2way
+      - DB_PASSWORD=m2way
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - m2way
+
+  app-blue:
+    build:
+      context: .
+      target: final
+    image: m2way-app:blue
+    container_name: m2way-app-blue
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=m2way
+      - DB_USERNAME=m2way
+      - DB_PASSWORD=m2way
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - m2way
+    restart: unless-stopped
+    profiles: [bluegreen]
+
+  app-green:
+    build:
+      context: .
+      target: final
+    image: m2way-app:green
+    container_name: m2way-app-green
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=m2way
+      - DB_USERNAME=m2way
+      - DB_PASSWORD=m2way
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - m2way
+    restart: unless-stopped
+    profiles: [bluegreen]
+
+  mysql:
+    image: mysql:8.4
+    container_name: m2way-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: m2way
+      MYSQL_USER: m2way
+      MYSQL_PASSWORD: m2way
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - m2way
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: m2way-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - m2way
+
+networks:
+  m2way:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

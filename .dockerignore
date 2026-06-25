@@ -1,0 +1,9 @@
+vendor
+node_modules
+.git
+.storage
+.env
+.DS_Store
+docker-compose.yml
+.idea
+.kilo
